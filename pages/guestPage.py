@@ -156,12 +156,14 @@ with st.sidebar:
     st.divider()
         
 # --- FOOTER SECTION ---
+current_year = datetime.now().year # This pulls 2026 automatically
+
 st.divider()
 st.markdown(
     """
     <div style="text-align: center; color: #666; font-size: 0.8rem;">
         <p style="margin: 0;"><strong>Department of Health - Baguio & Benguet - Cordillera</strong></p>
-        <p style="margin: 0;">DCPO Tracker System v1.0 | © 2024</p>
+        <p style="margin: 0; color: #888; font-size: 0.75rem;">DCPO Tracker System v1.0 | © {current_year}</p>
     </div>
     """,
     unsafe_allow_html=True
