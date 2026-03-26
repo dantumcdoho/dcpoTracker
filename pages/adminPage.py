@@ -253,7 +253,3 @@ with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/2/2a/DOH_PH_new_logo.svg", width=80)    
     st.write(f"Logged in: **{st.session_state.user_info['FullName']}**")
     st.divider()
-    if st.button("Logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user_info = None
-        st.rerun()
