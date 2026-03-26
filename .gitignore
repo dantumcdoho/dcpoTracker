@@ -1,0 +1,18 @@
+# Streamlit secrets (NEVER check this into GitHub)
+.streamlit/secrets.toml
+
+# Python virtual environment
+venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Local data or logs (if any)
+*.log
+*.csv
+*.xlsx
