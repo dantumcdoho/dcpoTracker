@@ -2,13 +2,14 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
+import time
 
 # 1. Page Configuration & Security
 st.set_page_config(page_title="Admin - DCPO Management", 
   layout="wide", 
   page_icon="🛡️")
 
-# Custom CHD-CAR Forest Green & Gold Styling
+# Custom DOH Cordillera Styling
 st.markdown("""
     <style>
     [data-testid="stHeader"] { background-color: #006400; }
@@ -30,12 +31,14 @@ st.markdown("""
     }
 
     [data-testid="stSidebar"] { border-right: 3px solid #FFD700; }
-
     [data-testid="stMetricValue"] { color: #006400; font-weight: bold; }
 
     div[data-testid="stExpander"], .stForm {
         border: 1px solid #006400; border-radius: 8px;
     }
+    
+    /* Minimize whitespace at the top */
+    .block-container { padding-top: 2rem; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -63,7 +66,6 @@ def add_modal(full_df):
     current_uid = st.session_state.user_info['UserId']
     curr_year = datetime.now().year
     
-    # Auto-increment logic for PersonnelOrderNo
     try:
         year_filter = full_df['PersonnelOrderNo'].astype(str).str.startswith(str(curr_year))
         year_records = full_df[year_filter]
@@ -82,13 +84,12 @@ def add_modal(full_df):
             st.text_input("Record ID (Auto)", value=auto_id, disabled=True)
             date_prepared = st.date_input("Date Prepared", value=datetime.now())
             date_travel = st.date_input("Date of Travel")
-            status = st.selectbox("Status", options=["done", "pending"], index=0)
+            status = st.selectbox("Status", options=["pending", "signed"], index=0)
         with col2:
             st.text_input("Order No (Auto)", value=new_seq, disabled=True)
             name_org = st.text_input("Name/Organization")
             place_travel = st.text_input("Place of Travel")
         
-        # New Column Added Here
         soft_copy_link = st.text_input("Soft Copy Link (URL)", placeholder="https://drive.google.com/...")
         purpose = st.text_area("Purpose of Travel")
         
@@ -104,22 +105,23 @@ def add_modal(full_df):
                 }
                 updated_df = pd.concat([full_df, pd.DataFrame([new_row])], ignore_index=True)
                 conn.update(worksheet="dcpo", data=updated_df)
-                st.success("New record added!")
+                
+                # Stabilized Success Sequence
+                st.balloons()
+                st.toast("✅ Record Added Successfully!", icon="💾")
+                time.sleep(1.5)
                 st.rerun()
 
 @st.dialog("📋 Full Record Details")
 def details_modal(row_data):
     st.write(f"### Details for {row_data['PersonnelOrderNo']}")
     st.divider()
-    
-    # Display details
     for col, val in row_data.items():
         if col == "SoftCopyLink" and pd.notna(val) and str(val).startswith("http"):
             st.markdown(f"**{col}:**")
             st.link_button("📂 View Document", val)
         else:
             st.markdown(f"**{col}:** {val}")
-            
     if st.button("Close", use_container_width=True):
         st.rerun()
 
@@ -127,26 +129,38 @@ def details_modal(row_data):
 def edit_modal(row_index, current_row, full_df):
     st.write(f"Editing: {current_row['PersonnelOrderNo']}")
     updated = {}
+    status_options = ["pending", "signed"]
     
-    # Using columns for a cleaner edit form
-    for col in full_df.columns:
-        is_disabled = col in ["RecordID", "UserId"]
-        updated[col] = st.text_input(f"{col}", value=str(current_row[col]), disabled=is_disabled)
+    with st.container():
+        for col in full_df.columns:
+            is_disabled = col in ["RecordID", "UserId"]
+            if col == "Status":
+                current_status = str(current_row[col]).lower()
+                stat_idx = status_options.index(current_status) if current_status in status_options else 0
+                updated[col] = st.selectbox(f"{col}", options=status_options, index=stat_idx)
+            else:
+                updated[col] = st.text_input(f"{col}", value=str(current_row[col]), disabled=is_disabled)
     
     if st.button("Update Google Sheet", type="primary", use_container_width=True):
         full_df.loc[row_index] = updated
         conn.update(worksheet="dcpo", data=full_df)
-        st.success("Successfully updated!")
+        
+        # Stabilized Success Sequence
+        st.balloons()
+        st.toast("✅ Record Updated Successfully!", icon="📝")
+        time.sleep(1.5)
         st.rerun()
 
 @st.dialog("⚠️ Confirm Delete")
 def delete_modal(row_index, full_df):
-    st.warning("Are you sure? This will permanently remove the record from the database.")
+    st.warning("Are you sure? This will permanently remove the record.")
     if st.button("Confirm Delete", type="primary", use_container_width=True):
         conn.update(worksheet="dcpo", data=full_df.drop(row_index))
+        st.toast("🗑️ Record Deleted.", icon="⚠️")
+        time.sleep(1)
         st.rerun()
 
-# --- 4. MAIN UI ---
+# --- 4. MAIN UI LOGIC ---
 st.title("🛡️ Admin: DCPO Records Management")
 
 try:
@@ -155,7 +169,6 @@ try:
 
     # --- LATEST DCPO CARD ---
     year_data = df[df['PersonnelOrderNo'].astype(str).str.startswith(str(curr_year))]
-    
     with st.container(border=True):
         st.subheader(f"✨ Latest DCPO for {curr_year}")
         if not year_data.empty:
@@ -164,9 +177,9 @@ try:
             c1.metric("Order No", last_record['PersonnelOrderNo'])
             c2.metric("Organization", (str(last_record['NameOrganization'])[:15] + "...") if len(str(last_record['NameOrganization'])) > 15 else last_record['NameOrganization'])
             c3.metric("Date", str(last_record['DateOfTravel']))
-            c4.metric("Status", last_record['Status'].upper())
+            c4.metric("Status", str(last_record['Status']).upper())
         else:
-            st.info(f"No records found for the year {curr_year}.")
+            st.info(f"No records found for {curr_year}.")
 
     # --- TOOLBAR ---
     with st.container(border=True):
@@ -180,36 +193,32 @@ try:
             if st.button("🔄 Refresh", use_container_width=True):
                 st.rerun()
 
-    # Filtering logic
     display_df = df[df.astype(str).apply(lambda x: x.str.lower().str.contains(search)).any(axis=1)] if search else df
+    
+    # Static container for the table to prevent resizing
+    table_container = st.container()
+    with table_container:
+        st.write(f"**Total Records Found:** {len(display_df)}")
+        view_df = display_df[['PersonnelOrderNo', 'DatePrepared', 'NameOrganization', 'Status', 'SoftCopyLink']]
+        event = st.dataframe(
+            view_df,
+            use_container_width=True,
+            hide_index=False,
+            selection_mode="single-row",
+            on_select="rerun",
+            height=400, # Fixed height prevents layout jumps
+            column_config={
+                "SoftCopyLink": st.column_config.LinkColumn("Document", display_text="Open 📄")
+            }
+        )
 
-    st.write(f"**Total Records Found:** {len(display_df)}")
-
-    # Adjusted selection to include the SoftCopyLink column (Assuming it's at the end)
-    # PersonnelOrderNo, DatePrepared, NameOrganization, SoftCopyLink
-    view_df = display_df[['PersonnelOrderNo', 'DatePrepared', 'NameOrganization', 'SoftCopyLink']]
-
-    # Scrollable Dataframe
-    event = st.dataframe(
-        view_df,
-        use_container_width=True,
-        hide_index=False,
-        selection_mode="single-row",
-        on_select="rerun",
-        height=350,
-        column_config={
-            "SoftCopyLink": st.column_config.LinkColumn("Document", display_text="Open 📄")
-        }
-    )
-
-    # --- 5. ACTION BAR ---
+    # --- ACTION BAR ---
     selected_indices = event.selection.rows
     if selected_indices:
         actual_index = display_df.index[selected_indices[0]]
         selected_row_data = display_df.loc[actual_index]
         
         st.success(f"Selected: **{selected_row_data['PersonnelOrderNo']}**")
-        
         b1, b2, b3, _ = st.columns([1, 1, 1, 5])
         with b1:
             if st.button("📝 Edit", use_container_width=True):
@@ -226,6 +235,19 @@ try:
 except Exception as e:
     st.error(f"Error loading dashboard: {e}")
 
+# --- 5. FOOTER (DYNAMIC YEAR 2026) ---
+current_year = datetime.now().year 
+st.divider()
+st.markdown(
+    f"""
+    <div style="text-align: center; color: #666; font-size: 0.8rem;">
+        <p style="margin: 0;"><strong>Department of Health - Baguio & Benguet - Cordillera</strong></p>
+        <p style="margin: 0; color: #888; font-size: 0.75rem;">CPDOHO - DCPO Tracker System v1.0 | © {current_year}</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 # SIDEBAR
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/2/2a/DOH_PH_new_logo.svg", width=80)    
@@ -235,17 +257,3 @@ with st.sidebar:
         st.session_state.logged_in = False
         st.session_state.user_info = None
         st.rerun()
-        
-# --- FOOTER SECTION ---
-current_year = datetime.now().year # This pulls 2026 automatically
-
-st.divider()
-st.markdown(
-    f"""
-    <div style="text-align: center; color: #666; font-size: 0.8rem;">
-        <p style="margin: 0;"><strong>Department of Health - Baguio & Benguet - Cordillera</strong></p>
-        <p style="margin: 0; color: #888; font-size: 0.75rem;">DCPO Tracker System v1.0 | © {current_year}</p>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
