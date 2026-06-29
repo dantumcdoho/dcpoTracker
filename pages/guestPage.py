@@ -152,7 +152,7 @@ except Exception as e:
 # SIDEBAR
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/2/2a/DOH_PH_new_logo.svg", width=80)
-    st.write("**CHD-CAR DCPO Tracker**")
+    st.write("**CPDOHO-BB DCPO Tracker**")
     st.divider()
         
 # --- FOOTER SECTION ---
