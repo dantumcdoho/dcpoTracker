@@ -6,7 +6,7 @@ from datetime import datetime
 # 1. Page Configuration
 st.set_page_config(page_title="DCPO Tracker Records", layout="wide", page_icon="📖")
 
-# --- CHD-CAR THEME CSS ---
+# --- CHD-CAR THEME CSS & STABILITY FIXES ---
 st.markdown("""
     <style>
     /* Top Header Bar */
@@ -38,6 +38,14 @@ st.markdown("""
         color: #006400;
         font-weight: bold;
     }
+
+    /* FIX: Force the dataframe wrapper element to strictly respect full width layout container */
+    div[data-testid="stDataFrame"] {
+        width: 100% !important;
+    }
+    div[data-testid="stDataFrame"] > div {
+        width: 100% !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -45,7 +53,6 @@ st.markdown("""
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_dcpo_data():
-    # ttl=300 keeps data cached for 5 minutes for performance
     return conn.read(worksheet="dcpo", ttl=300)
 
 @st.dialog("📋 Full Record Details")
@@ -53,11 +60,9 @@ def view_modal(row_data):
     st.write(f"### Details for {row_data['PersonnelOrderNo']}")
     st.divider()
     
-    # Display all data except the link in a table
     main_details = row_data.drop("SoftCopyLink")
     st.table(main_details.astype(str))
     
-    # Special Button for the Soft Copy Link
     link = row_data.get('SoftCopyLink', '')
     if pd.notna(link) and str(link).startswith("http"):
         st.link_button("📂 View Shared Soft Copy", link, use_container_width=True)
@@ -99,52 +104,52 @@ try:
             if st.button("🔄 Refresh", use_container_width=True):
                 st.rerun()
 
-    # Filtering logic
     display_df = df[df.astype(str).apply(lambda x: x.str.lower().str.contains(search)).any(axis=1)] if search else df
 
     # --- 5. DATA FRAME DISPLAY ---
-    st.write(f"**Total Records:** {len(display_df)}")
-    
-    # We display relevant columns including the SoftCopyLink
-    # Ensure your Sheet has these headers: PersonnelOrderNo, DatePrepared, NameOrganization, DateOfTravel, Status, SoftCopyLink
-    view_columns = ['PersonnelOrderNo', 'DateOfTravel', 'NameOrganization', 'Status', 'SoftCopyLink']
-    
-    # Safely select columns that exist in the dataframe
-    available_cols = [c for c in view_columns if c in display_df.columns]
-    view_df = display_df[available_cols]
+    # Put table inside a dedicated container boundary block
+    table_block = st.container()
+    with table_block:
+        st.write(f"**Total Records:** {len(display_df)}")
+        view_columns = ['PersonnelOrderNo', 'DateOfTravel', 'NameOrganization', 'Status', 'SoftCopyLink']
+        available_cols = [c for c in view_columns if c in display_df.columns]
+        view_df = display_df[available_cols]
 
-    # Configuration for the table
-    event = st.dataframe(
-        view_df,
-        use_container_width=True,
-        hide_index=True,
-        selection_mode="single-row",
-        on_select="rerun",
-        height=450,
-        column_config={
-            "PersonnelOrderNo": "Order No",
-            "DateOfTravel": "Travel Date",
-            "NameOrganization": "Organization",
-            "Status": st.column_config.TextColumn("Status"),
-            "SoftCopyLink": st.column_config.LinkColumn(
-                "Document", 
-                display_text="Open 📄", 
-                help="Click to view the soft copy of the Personnel Order"
-            )
-        }
-    )
+        event = st.dataframe(
+            view_df,
+            use_container_width=True,
+            hide_index=True,
+            selection_mode="single-row",
+            on_select="rerun",
+            height=450,
+            column_config={
+                "PersonnelOrderNo": "Order No",
+                "DateOfTravel": "Travel Date",
+                "NameOrganization": "Organization",
+                "Status": st.column_config.TextColumn("Status"),
+                "SoftCopyLink": st.column_config.LinkColumn(
+                    "Document", 
+                    display_text="Open 📄", 
+                    help="Click to view the soft copy of the Personnel Order"
+                )
+            }
+        )
 
     # --- 6. ACTION FOR SELECTED ROW ---
-    selected_indices = event.selection.rows
-    if selected_indices:
-        # Get the actual data from the filtered dataframe
-        actual_index = display_df.index[selected_indices[0]]
-        selected_row_data = display_df.loc[actual_index]
-        
-        if st.button(f"🔍 View Full Details for {selected_row_data['PersonnelOrderNo']}", use_container_width=True):
-            view_modal(selected_row_data)
-    else:
-        st.caption("💡 Select a row in the table above to view complete details.")
+    # Isolated in its own container to protect the vertical grid spacing
+    with st.container():
+        selected_indices = event.selection.rows
+        if selected_indices:
+            actual_index = display_df.index[selected_indices[0]]
+            selected_row_data = display_df.loc[actual_index]
+            
+            # Use columns to contain the button width cleanly
+            action_col, _ = st.columns([2, 3])
+            with action_col:
+                if st.button(f"🔍 View Details for {selected_row_data['PersonnelOrderNo']}", use_container_width=True):
+                    view_modal(selected_row_data)
+        else:
+            st.caption("💡 Select a row in the table above to view complete details.")
 
 except Exception as e:
     st.error(f"Error loading records: {e}")
@@ -152,11 +157,11 @@ except Exception as e:
 # SIDEBAR
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/2/2a/DOH_PH_new_logo.svg", width=80)
-    st.write("**CPDOHO-BB DCPO Tracker**")
+    st.write("**CHD-CAR DCPO Tracker**")
     st.divider()
         
 # --- FOOTER SECTION ---
-current_year = datetime.now().year # This pulls 2026 automatically
+current_year = datetime.now().year
 
 st.divider()
 st.markdown(
@@ -167,4 +172,4 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True
-)		
+)
