@@ -9,7 +9,7 @@ st.set_page_config(page_title="Admin - DCPO Management",
   layout="wide", 
   page_icon="🛡️")
 
-# Custom DOH Cordillera Styling
+# Custom DOH Cordillera Styling & Width Fixes
 st.markdown("""
     <style>
     [data-testid="stHeader"] { background-color: #006400; }
@@ -39,6 +39,14 @@ st.markdown("""
     
     /* Minimize whitespace at the top */
     .block-container { padding-top: 2rem; }
+
+    /* LAYOUT LOCK: Force the admin table wrapper to strictly stay at 100% width */
+    div[data-testid="stDataFrame"] {
+        width: 100% !important;
+    }
+    div[data-testid="stDataFrame"] > div {
+        width: 100% !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -201,7 +209,7 @@ try:
 
     display_df = df[df.astype(str).apply(lambda x: x.str.lower().str.contains(search)).any(axis=1)] if search else df
     
-    # Static container for the table to prevent resizing
+    # Static container block for full width structural layout stability
     table_container = st.container()
     with table_container:
         st.write(f"**Total Records Found:** {len(display_df)}")
@@ -212,31 +220,32 @@ try:
             hide_index=False,
             selection_mode="single-row",
             on_select="rerun",
-            height=400, # Fixed height prevents layout jumps
+            height=400, 
             column_config={
                 "SoftCopyLink": st.column_config.LinkColumn("Document", display_text="Open 📄")
             }
         )
 
     # --- ACTION BAR ---
-    selected_indices = event.selection.rows
-    if selected_indices:
-        actual_index = display_df.index[selected_indices[0]]
-        selected_row_data = display_df.loc[actual_index]
-        
-        st.success(f"Selected: **{selected_row_data['PersonnelOrderNo']}**")
-        b1, b2, b3, _ = st.columns([1, 1, 1, 5])
-        with b1:
-            if st.button("📝 Edit", use_container_width=True):
-                edit_modal(actual_index, selected_row_data, df)
-        with b2:
-            if st.button("🗑️ Delete", use_container_width=True):
-                delete_modal(actual_index, df)
-        with b3:
-            if st.button("🔍 Details", use_container_width=True):
-                details_modal(selected_row_data)
-    else:
-        st.info("💡 Select a row in the table above to interact with it.")
+    with st.container():
+        selected_indices = event.selection.rows
+        if selected_indices:
+            actual_index = display_df.index[selected_indices[0]]
+            selected_row_data = display_df.loc[actual_index]
+            
+            st.success(f"Selected: **{selected_row_data['PersonnelOrderNo']}**")
+            b1, b2, b3, _ = st.columns([1, 1, 1, 5])
+            with b1:
+                if st.button("📝 Edit", use_container_width=True):
+                    edit_modal(actual_index, selected_row_data, df)
+            with b2:
+                if st.button("🗑️ Delete", use_container_width=True):
+                    delete_modal(actual_index, df)
+            with b3:
+                if st.button("🔍 Details", use_container_width=True):
+                    details_modal(selected_row_data)
+        else:
+            st.info("💡 Select a row in the table above to interact with it.")
 
 except Exception as e:
     st.error(f"Error loading dashboard: {e}")
