@@ -62,56 +62,34 @@ def get_dcpo_data():
 @st.dialog("➕ Add New DCPO Record")
 def add_modal(full_df):
     st.subheader("New Personnel Order Details")
-    auto_id = f"REC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    
+    # Time variables
+    now = datetime.now()
+    curr_year = now.year
+    curr_month = f"{now.month:02d}" # Formats month as '06' instead of '6'
+    prefix = f"{curr_year}-{curr_month}" # Results in '2026-06'
+    
+    auto_id = f"REC-{now.strftime('%Y%m%d%H%M%S')}"
     current_uid = st.session_state.user_info['UserId']
-    curr_year = datetime.now().year
     
     try:
-        year_filter = full_df['PersonnelOrderNo'].astype(str).str.startswith(str(curr_year))
-        year_records = full_df[year_filter]
-        if not year_records.empty:
-            last_val = str(year_records['PersonnelOrderNo'].iloc[-1])
-            last_seq = int(last_val.split('-')[1])
-            new_seq = f"{curr_year}-{str(last_seq + 1).zfill(3)}"
+        # Filter records that start with 'YYYY-MM-'
+        month_filter = full_df['PersonnelOrderNo'].astype(str).str.startswith(prefix)
+        month_records = full_df[month_filter]
+        
+        if not month_records.empty:
+            # Get the very last order number assigned this month
+            last_val = str(month_records['PersonnelOrderNo'].iloc[-1])
+            # Split '2026-06-001' by the last dash to isolate the incrementing number
+            last_seq = int(last_val.split('-')[-1])
+            new_seq = f"{prefix}-{str(last_seq + 1).zfill(3)}"
         else:
-            new_seq = f"{curr_year}-001"
-    except:
-        new_seq = f"{curr_year}-001"
-
-    with st.form("add_new_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.text_input("Record ID (Auto)", value=auto_id, disabled=True)
-            date_prepared = st.date_input("Date Prepared", value=datetime.now())
-            date_travel = st.date_input("Date of Travel")
-            status = st.selectbox("Status", options=["pending", "signed"], index=0)
-        with col2:
-            st.text_input("Order No (Auto)", value=new_seq, disabled=True)
-            name_org = st.text_input("Name/Organization")
-            place_travel = st.text_input("Place of Travel")
-        
-        soft_copy_link = st.text_input("Soft Copy Link (URL)", placeholder="https://drive.google.com/...")
-        purpose = st.text_area("Purpose of Travel")
-        
-        if st.form_submit_button("Submit Record", use_container_width=True, type="primary"):
-            if not name_org or not place_travel:
-                st.error("Please fill in required fields.")
-            else:
-                new_row = {
-                    "RecordID": auto_id, "UserId": current_uid, "PersonnelOrderNo": new_seq,
-                    "DatePrepared": str(date_prepared), "NameOrganization": name_org,
-                    "DateOfTravel": str(date_travel), "PlaceOfTravel": place_travel,
-                    "Purpose": purpose, "Status": status, "SoftCopyLink": soft_copy_link
-                }
-                updated_df = pd.concat([full_df, pd.DataFrame([new_row])], ignore_index=True)
-                conn.update(worksheet="dcpo", data=updated_df)
-                
-                # Stabilized Success Sequence
-                st.balloons()
-                st.toast("✅ Record Added Successfully!", icon="💾")
-                time.sleep(1.5)
-                st.rerun()
-
+            # First record of the month
+            new_seq = f"{prefix}-001"
+    except Exception as e:
+        # Fallback if parsing fails or dataframe is corrupt
+        new_seq = f"{prefix}-001"
+      
 @st.dialog("📋 Full Record Details")
 def details_modal(row_data):
     st.write(f"### Details for {row_data['PersonnelOrderNo']}")
